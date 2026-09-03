@@ -1,0 +1,37 @@
+name: Credit Risk Platform CI
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  backend-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+      - name: Install dependencies & verify syntax
+        run: |
+          cd backend
+          pip install -r requirements.txt
+          python -m py_compile app.py model/train_model.py data/generate_data.py
+
+  frontend-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Build React Frontend
+        run: |
+          cd frontend
+          npm ci
+          npm run build
