@@ -19,8 +19,12 @@ jobs:
       - name: Install dependencies & verify syntax
         run: |
           cd backend
-          pip install -r requirements.txt
+          pip install -r requirements.txt pytest
           python -m py_compile app.py model/train_model.py data/generate_data.py
+      - name: Run tests
+        run: |
+          cd backend
+          python -m pytest -v
 
   frontend-test:
     runs-on: ubuntu-latest

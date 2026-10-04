@@ -80,18 +80,41 @@ REQUIRED_FIELDS = [
 ]
 
 
+NUMERIC_RANGES = {
+    "age": (18, 100),
+    "annual_income": (0, 1e9),
+    "employment_years": (0, 60),
+    "loan_amount": (0, 1e9),
+    "credit_score": (300, 850),
+    "existing_debt": (0, 1e9),
+    "num_open_accounts": (0, 100),
+    "previous_defaults": (0, 100),
+}
+
+
 def validate_payload(payload):
+    """Return an error message string, or None if the payload is valid."""
     missing = [f for f in REQUIRED_FIELDS if f not in payload]
     if missing:
         return f"Missing required fields: {', '.join(missing)}"
-    try:
-        float(payload["age"]); float(payload["annual_income"])
-        float(payload["employment_years"]); float(payload["loan_amount"])
-        float(payload["credit_score"]); float(payload["existing_debt"])
-        float(payload["num_open_accounts"]); float(payload["previous_defaults"])
-    except (TypeError, ValueError):
-        return "One or more numeric fields are invalid"
+    for field, (low, high) in NUMERIC_RANGES.items():
+        try:
+            value = float(payload[field])
+        except (TypeError, ValueError):
+            return "One or more numeric fields are invalid"
+        if not low <= value <= high:
+            return f"{field} must be between {low} and {high}"
+    if not isinstance(payload["loan_purpose"], str) or not payload["loan_purpose"].strip():
+        return "loan_purpose must be a non-empty string"
     return None
+
+
+def normalize_payload(payload):
+    """Cast numeric fields to real numbers (the API may receive numeric strings)."""
+    clean = dict(payload)
+    for field in NUMERIC_RANGES:
+        clean[field] = float(payload[field])
+    return clean
 
 
 def predict_risk(payload):
@@ -125,6 +148,7 @@ def create_applicant():
     if error:
         return jsonify({"error": error}), 400
 
+    payload = normalize_payload(payload)
     try:
         predicted_risk, proba = predict_risk(payload)
     except Exception as e:
@@ -156,8 +180,11 @@ def create_applicant():
 
 @app.route("/api/applicants", methods=["GET"])
 def list_applicants():
-    page = max(int(request.args.get("page", 1)), 1)
-    per_page = min(int(request.args.get("per_page", 20)), 100)
+    try:
+        page = max(int(request.args.get("page", 1)), 1)
+        per_page = min(max(int(request.args.get("per_page", 20)), 1), 100)
+    except ValueError:
+        return jsonify({"error": "page and per_page must be integers"}), 400
     offset = (page - 1) * per_page
 
     db = get_db()
